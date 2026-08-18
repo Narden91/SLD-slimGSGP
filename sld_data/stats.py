@@ -1,0 +1,151 @@
+"""
+Statistical aggregation, feature metrics, and distribution computations for SLD handwriting data.
+"""
+
+from typing import Any, Dict, List, Optional
+import numpy as np
+import pandas as pd
+
+from sld_data.schema import (
+    FEATURE_CATEGORIES_MAP,
+    FeatureCategory,
+    KINEMATIC_FEATURES,
+    LABEL_DESCRIPTION,
+    TARGET_COLUMN,
+)
+
+
+def compute_feature_stats(
+    df: pd.DataFrame,
+    features: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """
+    Compute comprehensive descriptive statistics for kinematic features.
+
+    Returns:
+        pd.DataFrame: Table with columns [Feature, Mean, Std, Min, Median, Max, IQR, Missing].
+    """
+    feature_list = features if features is not None else [f for f in KINEMATIC_FEATURES if f in df.columns]
+    records = []
+
+    for feat in feature_list:
+        series = pd.to_numeric(df[feat], errors="coerce")
+        missing_count = series.isna().sum()
+        valid = series.dropna()
+
+        if len(valid) == 0:
+            records.append({
+                "feature": feat,
+                "mean": np.nan,
+                "std": np.nan,
+                "min": np.nan,
+                "median": np.nan,
+                "max": np.nan,
+                "iqr": np.nan,
+                "missing": missing_count,
+            })
+            continue
+
+        q25 = valid.quantile(0.25)
+        q75 = valid.quantile(0.75)
+        iqr = q75 - q25
+
+        records.append({
+            "feature": feat,
+            "mean": valid.mean(),
+            "std": valid.std(),
+            "min": valid.min(),
+            "median": valid.median(),
+            "max": valid.max(),
+            "iqr": iqr,
+            "missing": missing_count,
+        })
+
+    stats_df = pd.DataFrame(records)
+    return stats_df
+
+
+def compute_label_distribution(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute label counts, percentages, and descriptive performance meanings.
+
+    Returns:
+        pd.DataFrame: Table with [Label, Description, Count, Percentage].
+    """
+    if TARGET_COLUMN not in df.columns:
+        return pd.DataFrame(columns=["label", "description", "count", "percentage"])
+
+    counts = df[TARGET_COLUMN].value_counts(dropna=False).sort_index()
+    total = len(df)
+    records = []
+
+    for label_val, count in counts.items():
+        desc = LABEL_DESCRIPTION.get(int(label_val), "Unknown")
+        records.append({
+            "label": int(label_val),
+            "description": desc,
+            "count": int(count),
+            "percentage": (count / total) * 100.0,
+        })
+
+    return pd.DataFrame(records)
+
+
+def compute_category_stats(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    """
+    Compute summary stats grouped by feature categories (Pressure, Tilt, Temporal, etc.).
+    """
+    category_tables: Dict[str, pd.DataFrame] = {}
+    for cat_enum, feat_names in FEATURE_CATEGORIES_MAP.items():
+        present_feats = [f for f in feat_names if f in df.columns]
+        if present_feats:
+            category_tables[cat_enum.value] = compute_feature_stats(df, present_feats)
+    return category_tables
+
+
+def compute_demographics_summary(df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Compute demographics summary (Gender, Dominant Hand, Age).
+    """
+    summary: Dict[str, Any] = {}
+
+    if "Gender" in df.columns:
+        summary["gender_counts"] = df["Gender"].value_counts().to_dict()
+
+    if "Dominant_Hand" in df.columns:
+        summary["dominant_hand_counts"] = df["Dominant_Hand"].value_counts().to_dict()
+
+    if "Age" in df.columns:
+        valid_age = df["Age"][(df["Age"] > 3) & (df["Age"] < 20)]
+        if len(valid_age) > 0:
+            summary["age_stats"] = {
+                "min": float(valid_age.min()),
+                "median": float(valid_age.median()),
+                "mean": float(valid_age.mean()),
+                "max": float(valid_age.max()),
+                "valid_count": int(len(valid_age)),
+            }
+
+    return summary
+
+
+def get_subject_trajectory(df: pd.DataFrame, subject_id: int) -> pd.DataFrame:
+    """
+    Extract task-by-task performance trajectory for a specific subject ID.
+
+    Returns:
+        pd.DataFrame: Columns [Task, Cohort, Label, Performance, Duration, Pressure].
+    """
+    sub_df = df[df["Id"] == subject_id].sort_values("Task").copy()
+    if sub_df.empty:
+        return pd.DataFrame()
+
+    sub_df["Performance"] = sub_df[TARGET_COLUMN].map(LABEL_DESCRIPTION)
+    cols = ["Task", "Cohort", TARGET_COLUMN, "Performance"]
+    if "writing_duration_overall" in sub_df.columns:
+        cols.append("writing_duration_overall")
+    if "mean:pressure" in sub_df.columns:
+        cols.append("mean:pressure")
+
+    available_cols = [c for c in cols if c in sub_df.columns]
+    return sub_df[available_cols].reset_index(drop=True)
