@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
-from sld_data.schema import (
+from src.core.schema import (
     FEATURE_CATEGORIES_MAP,
     FeatureCategory,
     KINEMATIC_FEATURES,

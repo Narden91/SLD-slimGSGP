@@ -1,11 +1,11 @@
 """
-Unit tests for sld_data.viewer module.
+Unit tests for terminal visualization module.
 """
 
 import pytest
-from sld_data.loader import get_dataset_summary, load_cohort, load_task
-from sld_data.preprocessor import prepare_tensors
-from sld_data.viewer import (
+from src.data.loader import get_dataset_summary, load_cohort, load_task
+from src.data.preprocessor import prepare_tensors
+from src.visualization.viewer import (
     render_dataset_overview,
     render_feature_categories,
     render_label_distribution,

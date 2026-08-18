@@ -162,7 +162,7 @@ class TaskData:
 
 @dataclass
 class PreparedTensors:
-    """Karpathy-style container for model-ready PyTorch tensors."""
+    """Container for model-ready PyTorch tensors."""
     X: torch.Tensor
     y: torch.Tensor
     feature_names: List[str]

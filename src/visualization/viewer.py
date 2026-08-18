@@ -12,7 +12,7 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 
-from sld_data.schema import (
+from src.core.schema import (
     DatasetSummary,
     FEATURE_CATEGORIES_MAP,
     FeatureCategory,
@@ -21,7 +21,7 @@ from sld_data.schema import (
     PreparedTensors,
     TARGET_COLUMN,
 )
-from sld_data.stats import (
+from src.analysis.stats import (
     compute_category_stats,
     compute_demographics_summary,
     compute_feature_stats,

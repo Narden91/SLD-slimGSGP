@@ -1,3 +1,3 @@
 """
-Tests for sld_data module.
+Unit and integration tests for SLD-slimGSGP codebase.
 """

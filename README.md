@@ -70,7 +70,8 @@ python main.py --run-slim
 ## 3. Python API Quickstart
 
 ```python
-import sld_data as sld
+import src as sld
+from src.genetic import SlimConfig, run_slim_experiment
 
 # 1. Load single task or entire cohort
 df_task = sld.load_task(cohort="1year", task=1, filter_absent=True)
@@ -83,6 +84,11 @@ tensors = sld.prepare_tensors(df_task, feature_set="kinematic", standardize=True
 
 print("X_train shape:", X_train.shape) # (N_train, 30)
 print("y_train shape:", y_train.shape) # (N_train,)
+
+# 3. Evolve Genetic Programming Symbolic Model
+config = SlimConfig(pop_size=50, n_iter=20, slim_version="SLIM+SIG2")
+result = run_slim_experiment(tensors, config=config)
+print(f"Test RMSE: {result.test_rmse:.4f}, Test MAE: {result.test_mae:.4f}")
 ```
 
 ---

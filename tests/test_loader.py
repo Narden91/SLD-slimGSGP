@@ -1,12 +1,12 @@
 """
-Unit tests for sld_data.loader module.
+Unit tests for data loader module.
 """
 
 import pytest
 import pandas as pd
 from pathlib import Path
 
-from sld_data.loader import (
+from src.data.loader import (
     get_available_cohorts,
     get_available_tasks,
     get_dataset_summary,
@@ -14,7 +14,7 @@ from sld_data.loader import (
     load_cohort,
     load_task,
 )
-from sld_data.schema import KINEMATIC_FEATURES, TARGET_COLUMN
+from src.core.schema import KINEMATIC_FEATURES, TARGET_COLUMN
 
 
 def test_get_available_cohorts():

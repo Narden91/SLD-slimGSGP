@@ -18,5 +18,5 @@ dev = [
 slim-gsgp = { path = "slim_v2", editable = true }
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "src"]
 testpaths = ["tests"]

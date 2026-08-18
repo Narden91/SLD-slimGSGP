@@ -1,5 +1,5 @@
 """
-Unit tests for sld_data.preprocessor module.
+Unit tests for data preprocessor module.
 """
 
 import pytest
@@ -7,8 +7,8 @@ import torch
 import numpy as np
 import pandas as pd
 
-from sld_data.loader import load_cohort, load_task
-from sld_data.preprocessor import (
+from src.data.loader import load_cohort, load_task
+from src.data.preprocessor import (
     clean_and_impute_demographics,
     encode_demographics,
     prepare_tensors,

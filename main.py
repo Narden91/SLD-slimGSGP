@@ -12,7 +12,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-import sld_data as sld
+import src as sld
+from src.genetic import SlimConfig, run_slim_experiment
 
 console = Console()
 
@@ -59,40 +60,15 @@ def run_slim_demo(cohort: str = "1year", task_id: int = 1, iterations: int = 15,
     """Run a fast SLIM-GSGP genetic programming demonstration on an SLD task."""
     console.print(f"\n[bold magenta]Running SLIM-GSGP demo on {cohort} - Task {task_id}...[/bold magenta]")
     try:
-        from slim_gsgp.main_slim import slim
-        from slim_gsgp.evaluators.fitness_functions import rmse
-
-        # Load task and prepare standardized tensors (excluding absent subjects)
         df = sld.load_task(cohort, task_id, filter_absent=True)
         tensors = sld.prepare_tensors(df, feature_set="kinematic", standardize=True)
-        (X_train, y_train), (X_val, y_val), (X_test, y_test) = sld.train_val_test_split(
-            tensors, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15, seed=42
-        )
+        config = SlimConfig(pop_size=pop_size, n_iter=iterations, slim_version="SLIM+SIG2", seed=42)
 
-        console.print(f"Dataset prepared: {len(X_train)} train, {len(X_val)} val, {len(X_test)} test samples. Features: {X_train.shape[1]}")
-        console.print(f"Evolving SLIM-GSGP tree (pop_size={pop_size}, n_iter={iterations})...")
+        console.print(f"Dataset prepared: {len(tensors.X)} total samples, 30 features. Evolving SLIM-GSGP tree...")
+        result = run_slim_experiment(tensors, config=config, dataset_name=f"sld_{cohort}_t{task_id}")
 
-        final_tree = slim(
-            X_train=X_train,
-            y_train=y_train,
-            X_test=X_val,
-            y_test=y_val,
-            dataset_name=f"sld_{cohort}_t{task_id}",
-            slim_version="SLIM+SIG2",
-            pop_size=pop_size,
-            n_iter=iterations,
-            ms_lower=0,
-            ms_upper=1,
-            p_inflate=0.5,
-            reconstruct=True,
-            verbose=False,
-        )
-
-        preds = final_tree.predict(X_test)
-        test_rmse = float(rmse(y_true=y_test, y_pred=preds))
-
-        console.print(f"[bold green][OK] SLIM-GSGP run finished successfully![/bold green]")
-        console.print(f"Test RMSE on Task {task_id}: [bold yellow]{test_rmse:.4f}[/bold yellow]")
+        console.print(f"[bold green][OK] SLIM-GSGP run finished successfully in {result.elapsed_seconds:.2f}s![/bold green]")
+        console.print(f"Test RMSE on Task {task_id}: [bold yellow]{result.test_rmse:.4f}[/bold yellow] | Test MAE: [bold yellow]{result.test_mae:.4f}[/bold yellow]")
 
     except ImportError as e:
         console.print(f"[red]Error loading slim-gsgp library:[/red] {e}")

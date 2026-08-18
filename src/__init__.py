@@ -1,8 +1,9 @@
 """
-SLD-slimGSGP Data Module: Structured data loading, preprocessing, tensor conversion, and visualization.
+SLD-slimGSGP: Research framework for online handwriting kinematics and SLIM-GSGP Genetic Programming.
 """
 
-from sld_data.schema import (
+# Core schema & types
+from src.core.schema import (
     ALL_COLUMNS,
     Cohort,
     CohortInfo,
@@ -23,7 +24,9 @@ from sld_data.schema import (
     TEMPORAL_FEATURES,
     TILT_FEATURES,
 )
-from sld_data.loader import (
+
+# Data loading & preprocessing
+from src.data.loader import (
     get_available_cohorts,
     get_available_tasks,
     get_dataset_summary,
@@ -33,26 +36,37 @@ from sld_data.loader import (
     load_cohort,
     load_task,
 )
-from sld_data.preprocessor import (
+from src.data.preprocessor import (
     clean_and_impute_demographics,
     encode_demographics,
     prepare_tensors,
     train_val_test_split,
 )
-from sld_data.stats import (
+
+# Analytics & Statistics
+from src.analysis.stats import (
     compute_category_stats,
     compute_demographics_summary,
     compute_feature_stats,
     compute_label_distribution,
     get_subject_trajectory,
 )
-from sld_data.viewer import (
+
+# Visualization
+from src.visualization.viewer import (
     render_dataset_overview,
     render_feature_categories,
     render_label_distribution,
     render_subject_profile,
     render_task_summary,
     render_tensor_summary,
+)
+
+# Genetic Programming
+from src.genetic.runner import (
+    SlimConfig,
+    SlimResult,
+    run_slim_experiment,
 )
 
 __all__ = [
@@ -103,4 +117,8 @@ __all__ = [
     "render_task_summary",
     "render_subject_profile",
     "render_tensor_summary",
+    # Genetic
+    "SlimConfig",
+    "SlimResult",
+    "run_slim_experiment",
 ]

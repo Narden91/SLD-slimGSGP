@@ -1,11 +1,11 @@
 """
-Unit tests for sld_data.stats module.
+Unit tests for analytics and stats module.
 """
 
 import pytest
 import pandas as pd
-from sld_data.loader import load_cohort, load_task
-from sld_data.stats import (
+from src.data.loader import load_cohort, load_task
+from src.analysis.stats import (
     compute_category_stats,
     compute_demographics_summary,
     compute_feature_stats,

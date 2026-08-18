@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from sld_data.schema import (
+from src.core.schema import (
     DEMOGRAPHIC_COLUMNS,
     KINEMATIC_FEATURES,
     PreparedTensors,

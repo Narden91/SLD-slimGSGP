@@ -11,7 +11,7 @@ import os
 import re
 import pandas as pd
 
-from sld_data.schema import (
+from src.core.schema import (
     ALL_COLUMNS,
     Cohort,
     CohortInfo,
@@ -25,11 +25,14 @@ from sld_data.schema import (
 def get_default_data_dir() -> Path:
     """Resolve the default dataset directory relative to project root."""
     current_dir = Path(__file__).resolve().parent
-    project_root = current_dir.parent
-    data_dir = project_root / "data"
-    if data_dir.is_dir():
-        return data_dir
-    # Fallback to local 'data'
+    for parent in [current_dir, *current_dir.parents]:
+        if (parent / "pyproject.toml").is_file():
+            candidate = parent / "data"
+            if candidate.is_dir():
+                return candidate
+        candidate = parent / "data"
+        if candidate.is_dir() and (candidate / "1year").is_dir():
+            return candidate
     return Path("data").resolve()
 
 
