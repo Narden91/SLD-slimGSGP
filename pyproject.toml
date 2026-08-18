@@ -1,0 +1,17 @@
+[project]
+name = "sld-slimgsgp"
+version = "0.1.0"
+description = "SLD-slimGSGP project"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "slim-gsgp",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.uv.sources]
+slim-gsgp = { path = "slim_v2", editable = true }

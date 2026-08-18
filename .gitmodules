@@ -1,0 +1,3 @@
+[submodule "slim_v2"]
+	path = slim_v2
+	url = https://github.com/Narden91/slim_v2.git
