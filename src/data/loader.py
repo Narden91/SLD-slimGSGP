@@ -11,6 +11,7 @@ import pandas as pd
 from src.core.schema import (
     Cohort,
     CohortInfo,
+    CSV_DTYPES,
     DatasetSummary,
     KINEMATIC_FEATURES,
     TaskData,
@@ -94,7 +95,12 @@ def load_task(
     if not file_path.is_file():
         raise FileNotFoundError(f"Task file not found: {file_path}")
 
-    df = pd.read_csv(file_path)
+    df = pd.read_csv(file_path, dtype=CSV_DTYPES)
+
+    missing_cols = CSV_DTYPES.keys() - set(df.columns)
+    if missing_cols:
+        raise ValueError(f"Malformed task file {file_path}: missing columns {sorted(missing_cols)}")
+
     df["Cohort"] = cohort_str
 
     if filter_absent:
@@ -201,7 +207,10 @@ def get_dataset_summary(data_dir: Optional[Union[str, Path]] = None) -> DatasetS
 
         label_dist = df_cohort[TARGET_COLUMN].value_counts().to_dict()
 
-        cohort_enum = Cohort(c_name) if c_name in [e.value for e in Cohort] else None
+        try:
+            cohort_enum = Cohort(c_name)
+        except ValueError:
+            cohort_enum = None
         cohort_summaries[c_name] = CohortInfo(
             cohort=cohort_enum or c_name,
             task_count=task_count,

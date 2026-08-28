@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 
 from src.core.schema import (
+    AGE_MAX_VALID,
+    AGE_MIN_VALID,
     FEATURE_CATEGORIES_MAP,
     FeatureCategory,
     KINEMATIC_FEATURES,
@@ -116,7 +118,7 @@ def compute_demographics_summary(df: pd.DataFrame) -> Dict[str, Any]:
         summary["dominant_hand_counts"] = df["Dominant_Hand"].value_counts().to_dict()
 
     if "Age" in df.columns:
-        valid_age = df["Age"][(df["Age"] > 3) & (df["Age"] < 20)]
+        valid_age = df["Age"][df["Age"].between(AGE_MIN_VALID, AGE_MAX_VALID, inclusive="neither")]
         if len(valid_age) > 0:
             summary["age_stats"] = {
                 "min": float(valid_age.min()),

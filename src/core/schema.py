@@ -92,6 +92,32 @@ DEMOGRAPHIC_COLUMNS: List[str] = [
     "Dominant_Hand",
 ]
 
+# Valid categorical demographic values as recorded by the acquisition device.
+# Any other value (e.g. the literal string '0') marks an unrecorded field.
+GENDER_VALUES: List[str] = ["Femminile", "Maschile"]
+DOMINANT_HAND_VALUES: List[str] = ["Destra", "Sinistra"]
+
+# One-hot / binary encodings used by encode_demographics(), keyed to the
+# same value lists above so the two stay in sync by construction.
+GENDER_ENCODING: Dict[str, float] = {v: float(i) for i, v in enumerate(GENDER_VALUES)}
+DOMINANT_HAND_ENCODING: Dict[str, float] = {v: float(i) for i, v in enumerate(DOMINANT_HAND_VALUES)}
+
+# Plausible age range (years) for primary-school subjects (grades 1-3).
+# Values outside this range (e.g. -4992.0, 0.0) are acquisition artifacts.
+AGE_MIN_VALID: float = 3.0
+AGE_MAX_VALID: float = 20.0
+# Fallback age when no valid value exists anywhere for a subject/cohort
+# (approximate median age for a first-grade child).
+AGE_DEFAULT_FALLBACK: float = 7.0
+
+# Default split ratios for train_val_test_split(); must sum to 1.0.
+DEFAULT_TRAIN_RATIO: float = 0.7
+DEFAULT_VAL_RATIO: float = 0.15
+DEFAULT_TEST_RATIO: float = 0.15
+
+# Default RNG seed for reproducible splits and SLIM-GSGP runs.
+DEFAULT_SEED: int = 42
+
 TARGET_COLUMN: str = "Label"
 
 FEATURE_CATEGORIES_MAP: Dict[FeatureCategory, List[str]] = {
@@ -101,6 +127,20 @@ FEATURE_CATEGORIES_MAP: Dict[FeatureCategory, List[str]] = {
     FeatureCategory.SPATIAL: SPATIAL_FEATURES,
     FeatureCategory.KINEMATICS: KINEMATICS_FEATURES,
     FeatureCategory.EVENTS: EVENT_FEATURES,
+}
+
+# Explicit dtypes for pd.read_csv(), derived from the feature taxonomy above.
+# Avoids per-file dtype sniffing (60 CSVs) and guards against silent dtype
+# drift between files. 'Age' is float64 because raw files contain float
+# anomalies (e.g. -4992.0) that must survive parsing for cleaning downstream.
+CSV_DTYPES: Dict[str, str] = {
+    "Id": "int64",
+    **{f: "float64" for f in KINEMATIC_FEATURES},
+    "Gender": "str",
+    "Age": "float64",
+    "Dominant_Hand": "str",
+    TARGET_COLUMN: "int64",
+    "Task": "int64",
 }
 
 # Task Performance Labels: 0 best, 2 worst; -1 indicates subject not present

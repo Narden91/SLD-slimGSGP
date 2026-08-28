@@ -8,7 +8,13 @@ from typing import Any, Dict, Optional, Tuple, Union
 import time
 import torch
 
-from src.core.schema import PreparedTensors
+from src.core.schema import (
+    DEFAULT_SEED,
+    DEFAULT_TEST_RATIO,
+    DEFAULT_TRAIN_RATIO,
+    DEFAULT_VAL_RATIO,
+    PreparedTensors,
+)
 from src.data.preprocessor import train_val_test_split
 
 
@@ -22,7 +28,7 @@ class SlimConfig:
     ms_lower: float = 0.0
     ms_upper: float = 1.0
     reconstruct: bool = True
-    seed: int = 42
+    seed: int = DEFAULT_SEED
     verbose: int = 0
 
 
@@ -68,7 +74,11 @@ def run_slim_experiment(
     # Unpack or split data
     if isinstance(data, PreparedTensors):
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = train_val_test_split(
-            data, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15, seed=config.seed
+            data,
+            train_ratio=DEFAULT_TRAIN_RATIO,
+            val_ratio=DEFAULT_VAL_RATIO,
+            test_ratio=DEFAULT_TEST_RATIO,
+            seed=config.seed,
         )
     else:
         (X_train, y_train), (X_val, y_val), (X_test, y_test) = data

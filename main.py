@@ -57,7 +57,7 @@ def run_full_dashboard(data_dir: Optional[str] = None) -> None:
     tensors = prepare_tensors(df_task1, feature_set="kinematic", standardize=True)
     render_tensor_summary(tensors)
 
-    train, val, test = train_val_test_split(tensors, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15)
+    train, val, test = train_val_test_split(tensors)
     console.print(
         f"[green][OK] Train split:[/green] X={tuple(train[0].shape)}, y={tuple(train[1].shape)} | "
         f"[yellow]Val split:[/yellow] X={tuple(val[0].shape)}, y={tuple(val[1].shape)} | "
@@ -71,7 +71,7 @@ def run_slim_demo(cohort: str = "1year", task_id: int = 1, iterations: int = 15,
     try:
         df = load_task(cohort, task_id, filter_absent=True)
         tensors = prepare_tensors(df, feature_set="kinematic", standardize=True)
-        config = SlimConfig(pop_size=pop_size, n_iter=iterations, slim_version="SLIM+SIG2", seed=42)
+        config = SlimConfig(pop_size=pop_size, n_iter=iterations, slim_version="SLIM+SIG2")
 
         console.print(f"Dataset prepared: {len(tensors.X)} total samples, 30 features. Evolving SLIM-GSGP tree...")
         result = run_slim_experiment(tensors, config=config, dataset_name=f"sld_{cohort}_t{task_id}")

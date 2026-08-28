@@ -9,7 +9,18 @@ import pandas as pd
 import torch
 
 from src.core.schema import (
+    AGE_DEFAULT_FALLBACK,
+    AGE_MAX_VALID,
+    AGE_MIN_VALID,
+    DEFAULT_SEED,
+    DEFAULT_TEST_RATIO,
+    DEFAULT_TRAIN_RATIO,
+    DEFAULT_VAL_RATIO,
     DEMOGRAPHIC_COLUMNS,
+    DOMINANT_HAND_ENCODING,
+    DOMINANT_HAND_VALUES,
+    GENDER_ENCODING,
+    GENDER_VALUES,
     KINEMATIC_FEATURES,
     PreparedTensors,
     TARGET_COLUMN,
@@ -38,34 +49,33 @@ def clean_and_impute_demographics(df: pd.DataFrame) -> pd.DataFrame:
     # categorical (anomalies like the literal string '0'). Both reduce to the
     # same pipeline: mask invalid values to NaN, propagate valid values within
     # each subject, then fall back to a default for whatever remains.
-    valid_age = df["Age"].where(df["Age"].apply(lambda x: isinstance(x, (int, float))) & df["Age"].between(3, 20, inclusive="neither"))
-    valid_gender = df["Gender"].astype(str).str.strip().where(lambda s: s.isin(["Femminile", "Maschile"]))
-    valid_hand = df["Dominant_Hand"].astype(str).str.strip().where(lambda s: s.isin(["Destra", "Sinistra"]))
+    valid_age = df["Age"].where(df["Age"].between(AGE_MIN_VALID, AGE_MAX_VALID, inclusive="neither"))
+    valid_gender = df["Gender"].str.strip().where(lambda s: s.isin(GENDER_VALUES))
+    valid_hand = df["Dominant_Hand"].str.strip().where(lambda s: s.isin(DOMINANT_HAND_VALUES))
 
     def _propagate(valid_series: pd.Series) -> pd.Series:
         return valid_series.groupby([df[c] for c in group_cols]).transform(lambda s: s.ffill().bfill())
 
     df["Age"] = _propagate(valid_age)
     age_fallback = df.groupby("Cohort")["Age"].transform("median") if has_cohort else df["Age"].median()
-    df["Age"] = df["Age"].fillna(age_fallback).fillna(7.0)
+    df["Age"] = df["Age"].fillna(age_fallback).fillna(AGE_DEFAULT_FALLBACK)
 
-    df["Gender"] = _propagate(valid_gender).fillna("Femminile")  # Mode
-    df["Dominant_Hand"] = _propagate(valid_hand).fillna("Destra")  # Mode
+    df["Gender"] = _propagate(valid_gender).fillna(GENDER_VALUES[0])  # Mode
+    df["Dominant_Hand"] = _propagate(valid_hand).fillna(DOMINANT_HAND_VALUES[0])  # Mode
 
     return df
 
 
 def encode_demographics(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Encode categorical demographic features into numeric values:
-    - Gender: 'Femminile' -> 0.0, 'Maschile' -> 1.0
-    - Dominant_Hand: 'Destra' -> 0.0, 'Sinistra' -> 1.0
+    Encode categorical demographic features into numeric values using the
+    GENDER_ENCODING / DOMINANT_HAND_ENCODING maps in src.core.schema.
     """
     df = df.copy()
     if "Gender" in df.columns:
-        df["Gender_encoded"] = df["Gender"].map({"Femminile": 0.0, "Maschile": 1.0}).fillna(0.0).astype(float)
+        df["Gender_encoded"] = df["Gender"].map(GENDER_ENCODING).fillna(0.0).astype(float)
     if "Dominant_Hand" in df.columns:
-        df["Hand_encoded"] = df["Dominant_Hand"].map({"Destra": 0.0, "Sinistra": 1.0}).fillna(0.0).astype(float)
+        df["Hand_encoded"] = df["Dominant_Hand"].map(DOMINANT_HAND_ENCODING).fillna(0.0).astype(float)
     return df
 
 
@@ -166,11 +176,11 @@ def prepare_tensors(
 
 def train_val_test_split(
     tensors: PreparedTensors,
-    train_ratio: float = 0.7,
-    val_ratio: float = 0.15,
-    test_ratio: float = 0.15,
+    train_ratio: float = DEFAULT_TRAIN_RATIO,
+    val_ratio: float = DEFAULT_VAL_RATIO,
+    test_ratio: float = DEFAULT_TEST_RATIO,
     shuffle: bool = True,
-    seed: Optional[int] = 42,
+    seed: Optional[int] = DEFAULT_SEED,
 ) -> Tuple[
     Tuple[torch.Tensor, torch.Tensor],
     Tuple[torch.Tensor, torch.Tensor],
@@ -182,7 +192,10 @@ def train_val_test_split(
     Returns:
         ((X_train, y_train), (X_val, y_val), (X_test, y_test))
     """
-    assert abs((train_ratio + val_ratio + test_ratio) - 1.0) < 1e-5, "Ratios must sum to 1.0"
+    if abs((train_ratio + val_ratio + test_ratio) - 1.0) >= 1e-5:
+        raise ValueError(
+            f"train_ratio + val_ratio + test_ratio must sum to 1.0, got {train_ratio + val_ratio + test_ratio}"
+        )
     N = tensors.X.shape[0]
 
     if seed is not None:
