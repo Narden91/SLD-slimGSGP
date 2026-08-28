@@ -2,100 +2,26 @@
 
 **SLD-slimGSGP** is a research framework for analyzing online handwriting kinematics and applying Semantic Linear Initialization & Mutation Geometric Semantic Genetic Programming (**SLIM-GSGP**) to screen and evaluate Specific Learning Disorders (SLD) / dysgraphia in primary school children.
 
----
+## Docs
 
-## 1. Dataset Organization
+- [docs/DATA.md](docs/DATA.md) — dataset layout, columns, demographics, target labels
+- [docs/COMMANDS.md](docs/COMMANDS.md) — CLI flags and Python API
+- [CLAUDE.md](CLAUDE.md) — architecture and conventions for contributors
 
-The `data/` folder contains kinematic data extracted from digital stylus/tablet recordings across 3 school cohorts:
+## Quickstart
 
-| Cohort | Grade / Year | Tasks | Unique Subjects | Total Rows |
-| :--- | :--- | :---: | :---: | :---: |
-| `1year/` | Grade 1 | 21 (`Task_1.csv` .. `Task_21.csv`) | 140 | 2,935 |
-| `2year/` | Grade 2 | 21 (`Task_1.csv` .. `Task_21.csv`) | 145 | 3,045 |
-| `3year/` | Grade 3 | 18 (`Task_1.csv` .. `Task_18.csv`) | 145 | 2,610 |
-| **Total** | | **60 CSVs** | **~145 / cohort** | **8,590** |
-
-### Data Columns & Feature Taxonomy
-Each CSV file contains **36 columns**:
-- **Subject Identifier (1)**: `Id`
-- **30 Kinematic Features**:
-  - *Pressure (4)*: `mean:pressure`, `std:pressure`, `iqr:pressure`, `number_of_changes_in_pressure_profile`
-  - *Tilt (3)*: `mean:tilt(on-surface)`, `std:tilt(on-surface)`, `iqr:tilt(on-surface)`
-  - *Temporal / Duration (5)*: `writing_duration(on-surface)`, `writing_duration_overall`, `mean:stroke_duration(on-surface)`, `in_air_movement_time`, `in_air_on_paper_ratio`
-  - *Spatial / Geometry (11)*: `writing_width(on-surface)`, `writing_height(on-surface)`, `mean:stroke_width(on-surface)`, `std:stroke_width(on-surface)`, `iqr:stroke_width(on-surface)`, `mean:stroke_height(on-surface)`, `std:stroke_height(on-surface)`, `iqr:stroke_height(on-surface)`, `mean:stroke_length(on-surface)`, `number_of_changes_in_x_profile`, `number_of_changes_in_y_profile`
-  - *Kinematics & Dynamics (6)*: `mean:velocity:axis-xy(on-surface)`, `std:velocity:axis-xy(on-surface)`, `mean:acceleration:axis-xy(on-surface)`, `std:acceleration:axis-xy(on-surface)`, `mean:jerk:axis-xy(on-surface)`, `average_normalized_jerk`
-  - *Events (1)*: `number_of_interruptions`
-- **Demographics & Metadata (4)**: `Gender`, `Age` (anomalous values cleaned & imputed), `Dominant_Hand`, `Task`
-- **Target Performance Score (1)**: `Label`
-  - `0`: Best Performance
-  - `1`: Intermediate Performance
-  - `2`: Worst Performance (Struggling)
-  - `-1`: Absent / Not present for the task
-
----
-
-## 2. CLI Usage (`main.py`)
-
-Run the full interactive dashboard:
 ```bash
-python main.py
+uv sync
+python main.py            # full dashboard
+pytest tests               # run the test suite
 ```
-
-### Command-Line Options
-```bash
-# Dataset overview table across cohorts
-python main.py --overview
-
-# Inspect specific cohort
-python main.py --cohort 1year
-
-# Inspect specific task with key indicators & score distributions
-python main.py --cohort 1year --task 1
-
-# Display 30 kinematic features breakdown
-python main.py --features
-
-# View subject longitudinal trajectory across tasks
-python main.py --cohort 1year --subject 1
-
-# Demonstrate PyTorch tensor extraction and train/val/test splits
-python main.py --tensor-demo
-
-# Run end-to-end SLIM-GSGP symbolic regression benchmark on SLD task
-python main.py --run-slim
-```
-
----
-
-## 3. Python API Quickstart
 
 ```python
-import src as sld
-from src.genetic import SlimConfig, run_slim_experiment
+from src.data.loader import load_task
+from src.data.preprocessor import prepare_tensors
 
-# 1. Load single task or entire cohort
-df_task = sld.load_task(cohort="1year", task=1, filter_absent=True)
-df_cohort = sld.load_cohort(cohort="2year")
-df_all = sld.load_all()
-
-# 2. Extract standardized PyTorch Tensors ready for SLIM-GSGP
-tensors = sld.prepare_tensors(df_task, feature_set="kinematic", standardize=True)
-(X_train, y_train), (X_val, y_val), (X_test, y_test) = sld.train_val_test_split(tensors)
-
-print("X_train shape:", X_train.shape) # (N_train, 30)
-print("y_train shape:", y_train.shape) # (N_train,)
-
-# 3. Evolve Genetic Programming Symbolic Model
-config = SlimConfig(pop_size=50, n_iter=20, slim_version="SLIM+SIG2")
-result = run_slim_experiment(tensors, config=config)
-print(f"Test RMSE: {result.test_rmse:.4f}, Test MAE: {result.test_mae:.4f}")
+df = load_task("1year", 1, filter_absent=True)
+tensors = prepare_tensors(df, feature_set="kinematic", standardize=True)
 ```
 
----
-
-## 4. Testing
-
-Run the test suite with `pytest`:
-```bash
-pytest tests
-```
+See [docs/COMMANDS.md](docs/COMMANDS.md) for the full CLI and API reference.

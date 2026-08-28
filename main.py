@@ -6,13 +6,19 @@ and integration with SLIM-GSGP genetic programming algorithms.
 
 import argparse
 import sys
-from typing import Optional
+from typing import List, Optional, Union
 
+import pandas as pd
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-from src.data.loader import get_dataset_summary, load_all, load_cohort, load_task
+from src.data.loader import (
+    get_available_cohorts,
+    get_available_tasks,
+    get_dataset_summary,
+    load_task,
+)
 from src.data.preprocessor import prepare_tensors, train_val_test_split
 from src.visualization.viewer import (
     render_dataset_overview,
@@ -25,6 +31,44 @@ from src.visualization.viewer import (
 from src.genetic.runner import SlimConfig, run_slim_experiment
 
 console = Console()
+
+ALL = "all"
+
+
+def _resolve_cohorts(selection: Optional[List[str]], data_dir: Optional[str]) -> List[str]:
+    """Resolve a --cohort selection ('all', one, or several names) to a cohort list."""
+    if not selection or selection == [ALL]:
+        return get_available_cohorts(data_dir=data_dir)
+    return selection
+
+
+def _resolve_tasks(cohort: str, selection: Optional[List[Union[int, str]]], data_dir: Optional[str]) -> List[int]:
+    """Resolve a --task selection ('all', one, or several IDs) to a task list for one cohort."""
+    if not selection or selection == [ALL]:
+        return get_available_tasks(cohort, data_dir=data_dir)
+    return [int(t) for t in selection]
+
+
+def load_selection(
+    cohorts: List[str],
+    tasks: Optional[List[Union[int, str]]],
+    data_dir: Optional[str] = None,
+    filter_absent: bool = False,
+) -> pd.DataFrame:
+    """
+    Load and concatenate every (cohort, task) combination in the selection.
+
+    `tasks` is resolved independently per cohort since task IDs and their
+    counts differ across cohorts (e.g. '3year' only has 18, not 21).
+    """
+    frames = [
+        load_task(cohort, task, data_dir=data_dir, filter_absent=filter_absent)
+        for cohort in cohorts
+        for task in _resolve_tasks(cohort, tasks, data_dir)
+    ]
+    if not frames:
+        raise ValueError("No matching (cohort, task) files found for the given selection.")
+    return pd.concat(frames, ignore_index=True)
 
 
 def run_full_dashboard(data_dir: Optional[str] = None) -> None:
@@ -45,7 +89,8 @@ def run_full_dashboard(data_dir: Optional[str] = None) -> None:
     render_dataset_overview(summary)
 
     # 2. Performance Label Distribution across all cohorts
-    df_all = load_all(data_dir=data_dir, filter_absent=False)
+    all_cohorts = get_available_cohorts(data_dir=data_dir)
+    df_all = load_selection(all_cohorts, tasks=None, data_dir=data_dir, filter_absent=False)
     render_label_distribution(df_all, title="Overall Performance Score Distribution (All Cohorts & Tasks)")
 
     # 3. Feature Categories Overview
@@ -65,19 +110,18 @@ def run_full_dashboard(data_dir: Optional[str] = None) -> None:
     )
 
 
-def run_slim_demo(cohort: str = "1year", task_id: int = 1, iterations: int = 15, pop_size: int = 50) -> None:
-    """Run a fast SLIM-GSGP genetic programming demonstration on an SLD task."""
-    console.print(f"\n[bold magenta]Running SLIM-GSGP demo on {cohort} - Task {task_id}...[/bold magenta]")
+def run_slim_demo(df: pd.DataFrame, label: str, iterations: int = 15, pop_size: int = 50) -> None:
+    """Run a fast SLIM-GSGP genetic programming demonstration on a loaded task selection."""
+    console.print(f"\n[bold magenta]Running SLIM-GSGP demo on {label}...[/bold magenta]")
     try:
-        df = load_task(cohort, task_id, filter_absent=True)
         tensors = prepare_tensors(df, feature_set="kinematic", standardize=True)
         config = SlimConfig(pop_size=pop_size, n_iter=iterations, slim_version="SLIM+SIG2")
 
         console.print(f"Dataset prepared: {len(tensors.X)} total samples, 30 features. Evolving SLIM-GSGP tree...")
-        result = run_slim_experiment(tensors, config=config, dataset_name=f"sld_{cohort}_t{task_id}")
+        result = run_slim_experiment(tensors, config=config, dataset_name=f"sld_{label}")
 
         console.print(f"[bold green][OK] SLIM-GSGP run finished successfully in {result.elapsed_seconds:.2f}s![/bold green]")
-        console.print(f"Test RMSE on Task {task_id}: [bold yellow]{result.test_rmse:.4f}[/bold yellow] | Test MAE: [bold yellow]{result.test_mae:.4f}[/bold yellow]")
+        console.print(f"Test RMSE: [bold yellow]{result.test_rmse:.4f}[/bold yellow] | Test MAE: [bold yellow]{result.test_mae:.4f}[/bold yellow]")
 
     except ImportError as e:
         console.print(f"[red]Error loading slim-gsgp library:[/red] {e}")
@@ -96,10 +140,12 @@ def main() -> None:
         "--overview", "-o", action="store_true", help="Display dataset high-level summary table"
     )
     parser.add_argument(
-        "--cohort", "-c", type=str, default=None, help="Inspect a specific cohort (e.g. '1year', '2year', '3year')"
+        "--cohort", "-c", type=str, nargs="+", default=None, metavar="COHORT",
+        help="One or more cohorts (e.g. '1year' '2year'), or 'all' for every cohort (default: all cohorts)",
     )
     parser.add_argument(
-        "--task", "-t", type=int, default=None, help="Inspect a specific task ID (e.g. 1 to 21)"
+        "--task", "-t", type=str, nargs="+", default=None, metavar="TASK",
+        help="One or more task IDs (e.g. 1 5 9), or 'all' for every task in the selected cohort(s) (default: all tasks)",
     )
     parser.add_argument(
         "--features", "-f", action="store_true", help="Display detailed 30 kinematic features breakdown"
@@ -111,7 +157,7 @@ def main() -> None:
         "--tensor-demo", action="store_true", help="Demonstrate PyTorch tensor preparation"
     )
     parser.add_argument(
-        "--run-slim", action="store_true", help="Execute quick SLIM-GSGP symbolic regression on loaded task"
+        "--run-slim", action="store_true", help="Execute quick SLIM-GSGP symbolic regression on loaded task(s)"
     )
 
     args = parser.parse_args()
@@ -122,46 +168,49 @@ def main() -> None:
         return
 
     # Specific routing
-    if args.overview:
-        summary = get_dataset_summary(data_dir=args.data_dir)
-        render_dataset_overview(summary)
+    try:
+        if args.overview:
+            summary = get_dataset_summary(data_dir=args.data_dir)
+            render_dataset_overview(summary)
 
-    if args.cohort and not args.task:
-        df_cohort = load_cohort(args.cohort, data_dir=args.data_dir, filter_absent=False)
-        render_label_distribution(df_cohort, title=f"Performance Distribution in Cohort {args.cohort}")
-        render_feature_categories(df=df_cohort)
+        if (args.cohort or args.task) and not (args.subject is not None or args.tensor_demo or args.run_slim):
+            cohorts = _resolve_cohorts(args.cohort, args.data_dir)
+            for cohort in cohorts:
+                for task_id in _resolve_tasks(cohort, args.task, args.data_dir):
+                    df_task = load_task(cohort, task_id, data_dir=args.data_dir, filter_absent=False)
+                    render_task_summary(cohort, task_id, df_task)
 
-    if args.task:
-        cohort = args.cohort or "1year"
-        df_task = load_task(cohort, args.task, data_dir=args.data_dir, filter_absent=False)
-        render_task_summary(cohort, args.task, df_task)
+        if args.features:
+            cohorts = _resolve_cohorts(args.cohort, args.data_dir)
+            df_selection = load_selection(cohorts, args.task, data_dir=args.data_dir, filter_absent=False)
+            render_feature_categories(df=df_selection)
 
-    if args.features:
-        df_all = load_all(data_dir=args.data_dir, filter_absent=False)
-        render_feature_categories(df=df_all)
+        if args.subject is not None:
+            # Subject IDs are cohort-local, so each selected cohort is rendered separately.
+            for cohort in _resolve_cohorts(args.cohort, args.data_dir):
+                df_cohort = load_selection([cohort], tasks=None, data_dir=args.data_dir, filter_absent=False)
+                render_subject_profile(df_cohort, subject_id=args.subject)
 
-    if args.subject is not None:
-        cohort = args.cohort or "1year"
-        df_cohort = load_cohort(cohort, data_dir=args.data_dir, filter_absent=False)
-        render_subject_profile(df_cohort, subject_id=args.subject)
+        if args.tensor_demo:
+            cohorts = _resolve_cohorts(args.cohort, args.data_dir)
+            df_selection = load_selection(cohorts, args.task, data_dir=args.data_dir, filter_absent=True)
+            tensors = prepare_tensors(df_selection, feature_set="kinematic", standardize=True)
+            render_tensor_summary(tensors)
+            train, val, test = train_val_test_split(tensors)
+            console.print(
+                f"[green][OK] Train:[/green] X={tuple(train[0].shape)}, y={tuple(train[1].shape)} | "
+                f"[yellow]Val:[/yellow] X={tuple(val[0].shape)}, y={tuple(val[1].shape)} | "
+                f"[magenta]Test:[/magenta] X={tuple(test[0].shape)}, y={tuple(test[1].shape)}"
+            )
 
-    if args.tensor_demo:
-        cohort = args.cohort or "1year"
-        task_id = args.task if args.task else 1
-        df_task = load_task(cohort, task_id, data_dir=args.data_dir, filter_absent=True)
-        tensors = prepare_tensors(df_task, feature_set="kinematic", standardize=True)
-        render_tensor_summary(tensors)
-        train, val, test = train_val_test_split(tensors)
-        console.print(
-            f"[green][OK] Train:[/green] X={tuple(train[0].shape)}, y={tuple(train[1].shape)} | "
-            f"[yellow]Val:[/yellow] X={tuple(val[0].shape)}, y={tuple(val[1].shape)} | "
-            f"[magenta]Test:[/magenta] X={tuple(test[0].shape)}, y={tuple(test[1].shape)}"
-        )
+        if args.run_slim:
+            cohorts = _resolve_cohorts(args.cohort, args.data_dir)
+            df_selection = load_selection(cohorts, args.task, data_dir=args.data_dir, filter_absent=True)
+            run_slim_demo(df_selection, label="+".join(cohorts))
 
-    if args.run_slim:
-        cohort = args.cohort or "1year"
-        task_id = args.task if args.task else 1
-        run_slim_demo(cohort=cohort, task_id=task_id)
+    except (FileNotFoundError, ValueError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
