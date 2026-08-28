@@ -5,7 +5,7 @@ Schema definitions, feature taxonomy, and data models for SLD (Specific Learning
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Tuple
 import pandas as pd
 import torch
 
@@ -92,19 +92,7 @@ DEMOGRAPHIC_COLUMNS: List[str] = [
     "Dominant_Hand",
 ]
 
-METADATA_COLUMNS: List[str] = [
-    "Id",
-    "Task",
-]
-
 TARGET_COLUMN: str = "Label"
-
-ALL_COLUMNS: List[str] = (
-    ["Id"]
-    + KINEMATIC_FEATURES
-    + DEMOGRAPHIC_COLUMNS
-    + ["Label", "Task"]
-)
 
 FEATURE_CATEGORIES_MAP: Dict[FeatureCategory, List[str]] = {
     FeatureCategory.PRESSURE: PRESSURE_FEATURES,

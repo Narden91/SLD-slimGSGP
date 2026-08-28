@@ -3,16 +3,12 @@ Data loader module for the SLD (Specific Learning Disorder) online handwriting d
 Fast, typed, and structured loading for individual tasks, cohorts, or the entire dataset.
 """
 
-from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional, Union
-import glob
-import os
 import re
 import pandas as pd
 
 from src.core.schema import (
-    ALL_COLUMNS,
     Cohort,
     CohortInfo,
     DatasetSummary,
@@ -36,9 +32,14 @@ def get_default_data_dir() -> Path:
     return Path("data").resolve()
 
 
+def _base(data_dir: Optional[Union[str, Path]] = None) -> Path:
+    """Resolve the base data directory, falling back to the default."""
+    return Path(data_dir) if data_dir else get_default_data_dir()
+
+
 def get_available_cohorts(data_dir: Optional[Union[str, Path]] = None) -> List[str]:
     """Return sorted list of available cohort directory names (e.g. ['1year', '2year', '3year'])."""
-    base_dir = Path(data_dir) if data_dir else get_default_data_dir()
+    base_dir = _base(data_dir)
     if not base_dir.is_dir():
         raise FileNotFoundError(f"Data directory not found at: {base_dir}")
     cohorts = [
@@ -58,7 +59,7 @@ def _extract_task_id(filename: str) -> int:
 
 def get_available_tasks(cohort: str, data_dir: Optional[Union[str, Path]] = None) -> List[int]:
     """Return sorted list of task IDs present in the given cohort directory."""
-    base_dir = Path(data_dir) if data_dir else get_default_data_dir()
+    base_dir = _base(data_dir)
     cohort_dir = base_dir / cohort
     if not cohort_dir.is_dir():
         raise FileNotFoundError(f"Cohort directory not found: {cohort_dir}")
@@ -87,7 +88,7 @@ def load_task(
         pd.DataFrame: Loaded task dataset with 'Cohort' metadata column.
     """
     cohort_str = cohort.value if isinstance(cohort, Cohort) else str(cohort)
-    base_dir = Path(data_dir) if data_dir else get_default_data_dir()
+    base_dir = _base(data_dir)
     file_path = base_dir / cohort_str / f"Task_{task}.csv"
 
     if not file_path.is_file():
@@ -174,7 +175,7 @@ def get_dataset_summary(data_dir: Optional[Union[str, Path]] = None) -> DatasetS
     Returns:
         DatasetSummary: Aggregated metadata, cohort info, file counts, and subject numbers.
     """
-    base_dir = Path(data_dir) if data_dir else get_default_data_dir()
+    base_dir = _base(data_dir)
     cohort_names = get_available_cohorts(base_dir)
 
     cohort_summaries: Dict[str, CohortInfo] = {}
@@ -187,8 +188,11 @@ def get_dataset_summary(data_dir: Optional[Union[str, Path]] = None) -> DatasetS
         task_count = len(tasks)
         total_files += task_count
 
-        # Load cohort data to calculate records and label distribution
-        df_cohort = load_cohort(c_name, base_dir, filter_absent=False)
+        # Load cohort data directly from the known task list (avoids re-scanning)
+        df_cohort = pd.concat(
+            [load_task(c_name, t, data_dir=base_dir, filter_absent=False) for t in tasks],
+            ignore_index=True,
+        )
         rec_count = len(df_cohort)
         total_records += rec_count
 

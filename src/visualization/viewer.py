@@ -231,6 +231,9 @@ def render_subject_profile(df: pd.DataFrame, subject_id: int) -> None:
         console.print(f"[red]Subject ID {subject_id} not found in the loaded dataset.[/red]")
         return
 
+    optional_cols = [c for c in ("writing_duration_overall", "mean:pressure") if c in traj.columns]
+    optional_labels = {"writing_duration_overall": "Duration (s)", "mean:pressure": "Mean Pressure"}
+
     table = Table(
         title=f"[bold cyan]Subject ID {subject_id} Performance Profile Across Tasks[/bold cyan]",
         box=box.ROUNDED,
@@ -239,23 +242,22 @@ def render_subject_profile(df: pd.DataFrame, subject_id: int) -> None:
     table.add_column("Cohort", justify="center")
     table.add_column("Score", justify="center")
     table.add_column("Performance Description", justify="left")
-    if "writing_duration_overall" in traj.columns:
-        table.add_column("Duration (s)", justify="right")
-    if "mean:pressure" in traj.columns:
-        table.add_column("Mean Pressure", justify="right")
+    for col in optional_cols:
+        table.add_column(optional_labels[col], justify="right")
 
     for _, row in traj.iterrows():
         lbl = int(row[TARGET_COLUMN])
         color = _get_label_color(lbl)
-        dur = f"{row['writing_duration_overall']:.2f}" if "writing_duration_overall" in row else "-"
-        press = f"{row['mean:pressure']:.1f}" if "mean:pressure" in row else "-"
+        optional_values = [
+            f"{row[col]:.2f}" if col == "writing_duration_overall" else f"{row[col]:.1f}"
+            for col in optional_cols
+        ]
         table.add_row(
             str(row["Task"]),
             str(row["Cohort"]),
             f"[{color}]{lbl}[/{color}]",
             f"[{color}]{row['Performance']}[/{color}]",
-            dur,
-            press,
+            *optional_values,
         )
 
     console.print()

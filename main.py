@@ -12,8 +12,17 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-import src as sld
-from src.genetic import SlimConfig, run_slim_experiment
+from src.data.loader import get_dataset_summary, load_all, load_cohort, load_task
+from src.data.preprocessor import prepare_tensors, train_val_test_split
+from src.visualization.viewer import (
+    render_dataset_overview,
+    render_feature_categories,
+    render_label_distribution,
+    render_subject_profile,
+    render_task_summary,
+    render_tensor_summary,
+)
+from src.genetic.runner import SlimConfig, run_slim_experiment
 
 console = Console()
 
@@ -32,23 +41,23 @@ def run_full_dashboard(data_dir: Optional[str] = None) -> None:
     )
 
     # 1. Dataset Overview
-    summary = sld.get_dataset_summary(data_dir=data_dir)
-    sld.render_dataset_overview(summary)
+    summary = get_dataset_summary(data_dir=data_dir)
+    render_dataset_overview(summary)
 
     # 2. Performance Label Distribution across all cohorts
-    df_all = sld.load_all(data_dir=data_dir, filter_absent=False)
-    sld.render_label_distribution(df_all, title="Overall Performance Score Distribution (All Cohorts & Tasks)")
+    df_all = load_all(data_dir=data_dir, filter_absent=False)
+    render_label_distribution(df_all, title="Overall Performance Score Distribution (All Cohorts & Tasks)")
 
     # 3. Feature Categories Overview
-    sld.render_feature_categories(df=df_all)
+    render_feature_categories(df=df_all)
 
     # 4. PyTorch Tensor Preparation Demo
     console.print("\n[bold cyan]--- Preparing PyTorch Tensors for SLIM-GSGP (Task 1, 1year) ---[/bold cyan]")
-    df_task1 = sld.load_task("1year", 1, data_dir=data_dir, filter_absent=True)
-    tensors = sld.prepare_tensors(df_task1, feature_set="kinematic", standardize=True)
-    sld.render_tensor_summary(tensors)
+    df_task1 = load_task("1year", 1, data_dir=data_dir, filter_absent=True)
+    tensors = prepare_tensors(df_task1, feature_set="kinematic", standardize=True)
+    render_tensor_summary(tensors)
 
-    train, val, test = sld.train_val_test_split(tensors, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15)
+    train, val, test = train_val_test_split(tensors, train_ratio=0.7, val_ratio=0.15, test_ratio=0.15)
     console.print(
         f"[green][OK] Train split:[/green] X={tuple(train[0].shape)}, y={tuple(train[1].shape)} | "
         f"[yellow]Val split:[/yellow] X={tuple(val[0].shape)}, y={tuple(val[1].shape)} | "
@@ -60,8 +69,8 @@ def run_slim_demo(cohort: str = "1year", task_id: int = 1, iterations: int = 15,
     """Run a fast SLIM-GSGP genetic programming demonstration on an SLD task."""
     console.print(f"\n[bold magenta]Running SLIM-GSGP demo on {cohort} - Task {task_id}...[/bold magenta]")
     try:
-        df = sld.load_task(cohort, task_id, filter_absent=True)
-        tensors = sld.prepare_tensors(df, feature_set="kinematic", standardize=True)
+        df = load_task(cohort, task_id, filter_absent=True)
+        tensors = prepare_tensors(df, feature_set="kinematic", standardize=True)
         config = SlimConfig(pop_size=pop_size, n_iter=iterations, slim_version="SLIM+SIG2", seed=42)
 
         console.print(f"Dataset prepared: {len(tensors.X)} total samples, 30 features. Evolving SLIM-GSGP tree...")
@@ -114,35 +123,35 @@ def main() -> None:
 
     # Specific routing
     if args.overview:
-        summary = sld.get_dataset_summary(data_dir=args.data_dir)
-        sld.render_dataset_overview(summary)
+        summary = get_dataset_summary(data_dir=args.data_dir)
+        render_dataset_overview(summary)
 
     if args.cohort and not args.task:
-        df_cohort = sld.load_cohort(args.cohort, data_dir=args.data_dir, filter_absent=False)
-        sld.render_label_distribution(df_cohort, title=f"Performance Distribution in Cohort {args.cohort}")
-        sld.render_feature_categories(df=df_cohort)
+        df_cohort = load_cohort(args.cohort, data_dir=args.data_dir, filter_absent=False)
+        render_label_distribution(df_cohort, title=f"Performance Distribution in Cohort {args.cohort}")
+        render_feature_categories(df=df_cohort)
 
     if args.task:
-        cohort = args.cohort if args.cohort else "1year"
-        df_task = sld.load_task(cohort, args.task, data_dir=args.data_dir, filter_absent=False)
-        sld.render_task_summary(cohort, args.task, df_task)
+        cohort = args.cohort or "1year"
+        df_task = load_task(cohort, args.task, data_dir=args.data_dir, filter_absent=False)
+        render_task_summary(cohort, args.task, df_task)
 
     if args.features:
-        df_all = sld.load_all(data_dir=args.data_dir, filter_absent=False)
-        sld.render_feature_categories(df=df_all)
+        df_all = load_all(data_dir=args.data_dir, filter_absent=False)
+        render_feature_categories(df=df_all)
 
     if args.subject is not None:
-        cohort = args.cohort if args.cohort else "1year"
-        df_cohort = sld.load_cohort(cohort, data_dir=args.data_dir, filter_absent=False)
-        sld.render_subject_profile(df_cohort, subject_id=args.subject)
+        cohort = args.cohort or "1year"
+        df_cohort = load_cohort(cohort, data_dir=args.data_dir, filter_absent=False)
+        render_subject_profile(df_cohort, subject_id=args.subject)
 
     if args.tensor_demo:
-        cohort = args.cohort if args.cohort else "1year"
+        cohort = args.cohort or "1year"
         task_id = args.task if args.task else 1
-        df_task = sld.load_task(cohort, task_id, data_dir=args.data_dir, filter_absent=True)
-        tensors = sld.prepare_tensors(df_task, feature_set="kinematic", standardize=True)
-        sld.render_tensor_summary(tensors)
-        train, val, test = sld.train_val_test_split(tensors)
+        df_task = load_task(cohort, task_id, data_dir=args.data_dir, filter_absent=True)
+        tensors = prepare_tensors(df_task, feature_set="kinematic", standardize=True)
+        render_tensor_summary(tensors)
+        train, val, test = train_val_test_split(tensors)
         console.print(
             f"[green][OK] Train:[/green] X={tuple(train[0].shape)}, y={tuple(train[1].shape)} | "
             f"[yellow]Val:[/yellow] X={tuple(val[0].shape)}, y={tuple(val[1].shape)} | "
@@ -150,7 +159,7 @@ def main() -> None:
         )
 
     if args.run_slim:
-        cohort = args.cohort if args.cohort else "1year"
+        cohort = args.cohort or "1year"
         task_id = args.task if args.task else 1
         run_slim_demo(cohort=cohort, task_id=task_id)
 

@@ -4,7 +4,7 @@ Unit tests for analytics and stats module.
 
 import pytest
 import pandas as pd
-from src.data.loader import load_cohort, load_task
+from src.data.loader import load_all, load_cohort, load_task
 from src.analysis.stats import (
     compute_category_stats,
     compute_demographics_summary,
@@ -53,3 +53,11 @@ def test_get_subject_trajectory():
     assert "Task" in traj.columns
     assert "Label" in traj.columns
     assert "Performance" in traj.columns
+
+
+def test_subject_trajectory_is_cohort_scoped():
+    # Subject IDs are cohort-local: without scoping, this would mix
+    # different children from 1year/2year/3year together.
+    traj = get_subject_trajectory(load_all(), subject_id=1, cohort="1year")
+    assert len(traj) == 21
+    assert set(traj["Cohort"].unique()) == {"1year"}

@@ -19,12 +19,12 @@ from src.core.schema import (
 def clean_and_impute_demographics(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean and impute demographic columns (Age, Gender, Dominant_Hand).
-    
+
     1. Subject-level propagation: If a subject has valid demographic records in some tasks,
        propagate them to tasks where they were unrecorded ('0' or <= 0).
     2. Cohort-level imputation: For any remaining unrecorded values, impute cohort median Age
        and mode Gender / Dominant_Hand.
-    
+
     Returns:
         pd.DataFrame: A copy of the DataFrame with cleaned and imputed demographic columns.
     """
@@ -32,33 +32,25 @@ def clean_and_impute_demographics(df: pd.DataFrame) -> pd.DataFrame:
 
     # Determine cohort group if available, otherwise entire dataframe
     group_cols = ["Cohort", "Id"] if "Cohort" in df.columns else ["Id"]
+    has_cohort = "Cohort" in df.columns
 
-    # 1. Clean Age anomalies (negative numbers like -4992.0 or 0.0)
-    df["Age_valid"] = df["Age"].apply(lambda x: x if (isinstance(x, (int, float)) and x > 3 and x < 20) else np.nan)
-    
-    # Propagate valid age per subject
-    df["Age"] = df.groupby(group_cols)["Age_valid"].transform(lambda s: s.ffill().bfill())
-    
-    # Impute remaining missing age with cohort median (or overall median, fallback 7.0)
-    if "Cohort" in df.columns:
-        cohort_age_median = df.groupby("Cohort")["Age"].transform("median")
-        df["Age"] = df["Age"].fillna(cohort_age_median).fillna(7.0)
-    else:
-        df["Age"] = df["Age"].fillna(df["Age"].median()).fillna(7.0)
-    
-    df.drop(columns=["Age_valid"], inplace=True)
+    # Age is numeric (anomalies like -4992.0 or 0.0); Gender/Dominant_Hand are
+    # categorical (anomalies like the literal string '0'). Both reduce to the
+    # same pipeline: mask invalid values to NaN, propagate valid values within
+    # each subject, then fall back to a default for whatever remains.
+    valid_age = df["Age"].where(df["Age"].apply(lambda x: isinstance(x, (int, float))) & df["Age"].between(3, 20, inclusive="neither"))
+    valid_gender = df["Gender"].astype(str).str.strip().where(lambda s: s.isin(["Femminile", "Maschile"]))
+    valid_hand = df["Dominant_Hand"].astype(str).str.strip().where(lambda s: s.isin(["Destra", "Sinistra"]))
 
-    # 2. Clean Gender ('Femminile', 'Maschile', '0')
-    df["Gender_valid"] = df["Gender"].apply(lambda x: str(x).strip() if str(x).strip() in ["Femminile", "Maschile"] else np.nan)
-    df["Gender"] = df.groupby(group_cols)["Gender_valid"].transform(lambda s: s.ffill().bfill())
-    df["Gender"] = df["Gender"].fillna("Femminile")  # Mode
-    df.drop(columns=["Gender_valid"], inplace=True)
+    def _propagate(valid_series: pd.Series) -> pd.Series:
+        return valid_series.groupby([df[c] for c in group_cols]).transform(lambda s: s.ffill().bfill())
 
-    # 3. Clean Dominant_Hand ('Destra', 'Sinistra', '0')
-    df["Hand_valid"] = df["Dominant_Hand"].apply(lambda x: str(x).strip() if str(x).strip() in ["Destra", "Sinistra"] else np.nan)
-    df["Dominant_Hand"] = df.groupby(group_cols)["Hand_valid"].transform(lambda s: s.ffill().bfill())
-    df["Dominant_Hand"] = df["Dominant_Hand"].fillna("Destra")  # Mode
-    df.drop(columns=["Hand_valid"], inplace=True)
+    df["Age"] = _propagate(valid_age)
+    age_fallback = df.groupby("Cohort")["Age"].transform("median") if has_cohort else df["Age"].median()
+    df["Age"] = df["Age"].fillna(age_fallback).fillna(7.0)
+
+    df["Gender"] = _propagate(valid_gender).fillna("Femminile")  # Mode
+    df["Dominant_Hand"] = _propagate(valid_hand).fillna("Destra")  # Mode
 
     return df
 
@@ -141,21 +133,21 @@ def prepare_tensors(
         X_mat = (X_mat - mean) / std
 
     # 6. Convert to PyTorch Tensors
-    X_tensor = torch.from_numpy(np.array(X_mat, copy=True)).to(dtype)
+    X_tensor = torch.tensor(X_mat, dtype=dtype)
     y_tensor = (
-        torch.from_numpy(np.array(data[target_col].to_numpy(dtype=np.float32), copy=True)).to(dtype)
+        torch.tensor(data[target_col].to_numpy(dtype=np.float32), dtype=dtype)
         if target_col in data.columns
         else torch.empty(0)
     )
 
     subject_ids = (
-        torch.from_numpy(np.array(data["Id"].to_numpy(dtype=np.int64), copy=True))
+        torch.tensor(data["Id"].to_numpy(dtype=np.int64))
         if "Id" in data.columns
         else torch.empty(0, dtype=torch.int64)
     )
 
     task_ids = (
-        torch.from_numpy(np.array(data["Task"].to_numpy(dtype=np.int64), copy=True))
+        torch.tensor(data["Task"].to_numpy(dtype=np.int64))
         if "Task" in data.columns
         else torch.empty(0, dtype=torch.int64)
     )

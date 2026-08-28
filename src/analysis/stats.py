@@ -129,23 +129,34 @@ def compute_demographics_summary(df: pd.DataFrame) -> Dict[str, Any]:
     return summary
 
 
-def get_subject_trajectory(df: pd.DataFrame, subject_id: int) -> pd.DataFrame:
+def get_subject_trajectory(
+    df: pd.DataFrame,
+    subject_id: int,
+    cohort: Optional[str] = None,
+) -> pd.DataFrame:
     """
     Extract task-by-task performance trajectory for a specific subject ID.
+
+    Subject IDs are cohort-local (not globally unique), so passing `cohort`
+    is required whenever `df` may span more than one cohort — otherwise
+    rows from different children can be mixed together. If `cohort` is
+    omitted and `df` spans multiple cohorts, results are sorted by
+    [Cohort, Task] instead of [Task] alone to keep each cohort contiguous.
 
     Returns:
         pd.DataFrame: Columns [Task, Cohort, Label, Performance, Duration, Pressure].
     """
-    sub_df = df[df["Id"] == subject_id].sort_values("Task").copy()
+    sub_df = df[df["Id"] == subject_id]
+    if cohort is not None and "Cohort" in sub_df.columns:
+        sub_df = sub_df[sub_df["Cohort"] == cohort]
+
+    multi_cohort = "Cohort" in sub_df.columns and sub_df["Cohort"].nunique() > 1
+    sort_cols = ["Cohort", "Task"] if multi_cohort else ["Task"]
+    sub_df = sub_df.sort_values(sort_cols).copy()
     if sub_df.empty:
         return pd.DataFrame()
 
     sub_df["Performance"] = sub_df[TARGET_COLUMN].map(LABEL_DESCRIPTION)
-    cols = ["Task", "Cohort", TARGET_COLUMN, "Performance"]
-    if "writing_duration_overall" in sub_df.columns:
-        cols.append("writing_duration_overall")
-    if "mean:pressure" in sub_df.columns:
-        cols.append("mean:pressure")
-
+    cols = ["Task", "Cohort", TARGET_COLUMN, "Performance", "writing_duration_overall", "mean:pressure"]
     available_cols = [c for c in cols if c in sub_df.columns]
     return sub_df[available_cols].reset_index(drop=True)
