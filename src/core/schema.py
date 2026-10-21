@@ -143,6 +143,23 @@ CSV_DTYPES: Dict[str, str] = {
     "Task": "int64",
 }
 
+# Audit ingestion preserves malformed tokens and missing identifiers for inspection.
+EDA_CSV_DTYPES: Dict[str, str] = {column: "string" for column in CSV_DTYPES}
+EDA_VALID_LABELS: Tuple[int, ...] = (0, 1, 2)
+EDA_UNKNOWN_LABEL: int = -1
+EDA_EXPECTED_TASKS: Dict[str, int] = {"1year": 21, "2year": 21, "3year": 18}
+EDA_FOLD_COUNTS: Tuple[int, ...] = (2, 3, 4, 5)
+EDA_CANDIDATE_SEEDS: Tuple[int, ...] = (DEFAULT_SEED, DEFAULT_SEED + 1)
+EDA_RARE_CLASS_THRESHOLD: int = 5
+EDA_MIN_FOLD_SUPPORT: int = 5
+EDA_NEAR_CONSTANT_FRACTION: float = 0.95
+EDA_EXTREME_IQR_MULTIPLIER: float = 3.0
+EDA_PERCENTILES: Tuple[float, ...] = (0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99)
+EDA_SCALE_RATIO_WARNING: float = 1000.0
+EDA_DURATION_RELATIONSHIPS: Tuple[Tuple[str, str], ...] = (
+    ("writing_duration_overall", "writing_duration(on-surface)"),
+)
+
 # Task Performance Labels: 0 best, 2 worst; -1 indicates subject not present
 LABEL_DESCRIPTION: Dict[int, str] = {
     0: "Best Performance (Score 0)",

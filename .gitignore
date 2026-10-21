@@ -102,6 +102,9 @@ data/*
 
 # Notebooks
 notebooks/*
+!notebooks/eda/
+notebooks/eda/*
+!notebooks/eda/*.ipynb
 
 checkpoints/*
 logs/*
@@ -141,3 +144,6 @@ wandb_cache
 *.glg
 *.synctex.gz
 *.png
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
